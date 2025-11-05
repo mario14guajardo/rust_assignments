@@ -1,0 +1,82 @@
+use serde::Deserialize;
+use std::error::Error;
+use std::fs::File;
+use std::io::copy;
+
+#[derive(Debug, Deserialize)]
+struct DogImage {
+    message: String,
+    status: String,
+}
+
+#[derive(Debug)]
+enum AppError {
+    ApiError(String),
+    NetworkError(String),
+    DownloadError(String),
+}
+
+fn fetch_random_dog_image() -> Result<DogImage, AppError> {
+    let url = "https://dog.ceo/api/breeds/image/random";
+
+    match ureq::get(url).call() {
+        Ok(response) => {
+            if response.status() != 200 {
+                return Err(AppError::ApiError(format!("HTTP error: {}", response.status())));
+            }
+            response
+                .into_json::<DogImage>()
+                .map_err(|e| AppError::ApiError(format!("Failed to parse JSON: {}", e)))
+        }
+        Err(e) => Err(AppError::NetworkError(format!("Request failed: {}", e))),
+    }
+}
+
+fn download_image(url: &str, file_name: &str) -> Result<(), AppError> {
+    let resp = reqwest::blocking::get(url)
+        .map_err(|e| AppError::NetworkError(format!("Download request failed: {}", e)))?;
+
+    if !resp.status().is_success() {
+        return Err(AppError::DownloadError(format!(
+            "Failed to download image: HTTP {}",
+            resp.status()
+        )));
+    }
+
+    let mut file = File::create(file_name)
+        .map_err(|e| AppError::DownloadError(format!("File save error: {}", e)))?;
+    let content = resp.bytes()
+        .map_err(|e| AppError::DownloadError(format!("Failed reading image bytes: {}", e)))?;
+
+    copy(&mut content.as_ref(), &mut file)
+        .map_err(|e| AppError::DownloadError(format!("Copy error: {}", e)))?;
+
+    Ok(())
+}
+
+fn main() -> Result<(), Box<dyn Error>> {
+    println!("Dog Image Fetcher");
+    println!("=================\n");
+
+    for i in 1..=5 {
+        println!("Fetching random dog image #{}", i);
+
+        match fetch_random_dog_image() {
+            Ok(dog_image) => {
+                println!("✅ Success!");
+                println!("📎 URL: {}", dog_image.message);
+
+                let filename = format!("dog{}.jpg", i);
+                match download_image(&dog_image.message, &filename) {
+                    Ok(_) => println!("💾 Saved as: {}", filename),
+                    Err(e) => println!("❌ Download Error: {:?}", e),
+                }
+            }
+            Err(e) => println!("❌ Error: {:?}", e),
+        }
+
+        println!();
+    }
+
+    Ok(())
+}
