@@ -1,0 +1,74 @@
+trait ShowInfo {
+    fn show_info(&self);
+}
+
+struct Undergrad {
+    gpa: f32,
+    major: String,
+}
+
+struct Grad {
+    gpa: f32,
+    major: String,
+    thesis: String,
+}
+
+impl ShowInfo for Undergrad {
+    fn show_info(&self) {
+        println!("=== Undergrad ===
+         Major: {}, 
+         GPA: {:.2}",
+          self.major, self.gpa);
+    }
+}
+
+impl ShowInfo for Grad {
+    fn show_info(&self) {
+        println!(
+            "=== Grad ===
+             Major: {}, 
+            GPA: {:.2}, 
+            Thesis: {}",
+            self.major, self.gpa, self.thesis
+        );
+    }
+}
+
+struct Enrollment {
+    students: Vec<Box<dyn ShowInfo>>,
+}
+
+impl Enrollment {
+    fn new() -> Self {
+        Enrollment { students: Vec::new() }
+    }
+
+    fn add<T: ShowInfo + 'static>(&mut self, student: T) {
+        self.students.push(Box::new(student));
+    }
+
+    fn show_info(&self) {
+        for s in &self.students {
+            s.show_info();
+        }
+    }
+}
+
+fn main() {
+    let u = Undergrad {
+        gpa: 3.5,
+        major: "Computer Engineering".to_string(),
+    };
+
+    let g = Grad {
+        gpa: 3.9,
+        major: "Electrical Engieering".to_string(),
+        thesis: "AI Optimization".to_string(),
+    };
+
+    let mut enrollment = Enrollment::new();
+    enrollment.add(u);
+    enrollment.add(g);
+
+    enrollment.show_info();
+}
